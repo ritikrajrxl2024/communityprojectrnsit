@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockLedger | Livestock Health &amp; Withdrawal Registry</title>
+  <meta name="description" content="Veterinary health logs, batch vaccination tracking, and slaughter/milk withdrawal period management for livestock operations.">
+  
+  <!-- Purposeful Typography: Source Serif 4 (Editorial Authority), Public Sans (Pragmatic Workhorse), JetBrains Mono (Data/Serials) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- TOP UTILITY STRIP: Operational Premises & Farm Metadata -->
+  <header class="utility-banner">
+    <div class="site-container banner-inner">
+      <div class="facility-meta">
+        <span class="meta-label">Facility PIN:</span>
+        <span class="meta-value mono">TX-AG-80941</span>
+        <span class="divider">/</span>
+        <span class="meta-label">Premise:</span>
+        <span class="meta-value">Brazos River Basin Pastures</span>
+        <span class="divider">/</span>
+        <span class="meta-label">Supervising Vet:</span>
+        <span class="meta-value">Dr. C. Vance, DVM (Lic #44182)</span>
+      </div>
+      <div class="system-clock">
+        <span class="clock-indicator"></span>
+        <span id="currentDateDisplay" class="mono">-- --- ----</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- PRIMARY NAV & HEADING -->
+  <nav class="masthead">
+    <div class="site-container masthead-inner">
+      <div class="brand-group">
+        <div class="brand-mark">SL</div>
+        <div class="brand-text">
+          <h1 class="brand-title">StockLedger</h1>
+          <p class="brand-subtitle">Clinical Records &amp; Biosecurity Withdrawal Registry</p>
+        </div>
+      </div>
+      
+      <div class="masthead-actions">
+        <button type="button" class="btn btn-secondary" id="exportCsvBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export Ledger (CSV)
+        </button>
+        <button type="button" class="btn btn-primary" id="openLogModalBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Record Treatment / Vaccine
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="site-container main-content">
+    
+    <!-- REGULATORY WITHHOLD BANNER (Real Agricultural Compliance Alert) -->
+    <section class="compliance-alert" id="activeWithholdAlert">
+      <div class="alert-icon-wrap">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="alert-content">
+        <h2 class="alert-title">Active Food Safety Withhold In Effect</h2>
+        <p class="alert-desc">
+          <strong id="withholdCount">0</strong> animals are currently within their statutory meat or milk withdrawal window. 
+          Off-farm transit for slaughter or bulk tank milk integration is strictly prohibited until clearance timestamps elapse.
+        </p>
+      </div>
+      <button type="button" class="alert-action-link" id="filterWithholdOnlyBtn">Inspect Restricted Animals &rarr;</button>
+    </section>
+
+    <!-- KEY OPERATIONS CENSUS (Structured Industrial Status Bar) -->
+    <section class="census-bar">
+      <div class="census-item">
+        <span class="census-label">Active Head Count</span>
+        <div class="census-num-group">
+          <span class="census-number" id="totalHeadCount">0</span>
+          <span class="census-context">Registered</span>
+        </div>
+      </div>
+      <div class="census-item warn">
+        <span class="census-label">Statutory Withhold</span>
+        <div class="census-num-group">
+          <span class="census-number" id="statutoryWithholdCount">0</span>
+          <span class="census-context">Withdrawal Active</span>
+        </div>
+      </div>
+      <div class="census-item alert">
+        <span class="census-label">Quarantine Isolation</span>
+        <div class="census-num-group">
+          <span class="census-number" id="quarantineCount">0</span>
+          <span class="census-context">Observation Pen</span>
+        </div>
+      </div>
+      <div class="census-item">
+        <span class="census-label">Booster Overdue (30d)</span>
+        <div class="census-num-group">
+          <span class="census-number" id="overdueBoosterCount">0</span>
+          <span class="census-context">Due for Protocol</span>
+        </div>
+      </div>
+      <div class="census-item neutral">
+        <span class="census-label">Vaccine Lot Audits</span>
+        <div class="census-num-group">
+          <span class="census-number" id="activeLotCount">0</span>
+          <span class="census-context">USDA Tracked</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- WORKSPACE TABS & FILTER TOOLBAR -->
+    <section class="workspace-section">
+      <div class="workspace-header">
+        <div class="view-tabs" role="tablist">
+          <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="herd">
+            Herd &amp; Flock Registry
+            <span class="tab-count" id="herdTabCount">0</span>
+          </button>
+          <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="treatments">
+            Clinical Administration Log
+            <span class="tab-count" id="treatmentTabCount">0</span>
+          </button>
+          <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="protocols">
+            Mandatory Protocols &amp; Boosters
+          </button>
+        </div>
+
+        <div class="toolbar-search">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="globalSearchInput" placeholder="Filter by Tag ID, RFID, Drug, or Lot #..." aria-label="Search records">
+          </div>
+          <select id="speciesFilterSelect" class="filter-select" aria-label="Filter by Species">
+            <option value="ALL">All Species</option>
+            <option value="Bovine">Bovine (Cattle)</option>
+            <option value="Ovine">Ovine (Sheep)</option>
+            <option value="Caprine">Caprine (Goat)</option>
+            <option value="Porcine">Porcine (Swine)</option>
+            <option value="Equine">Equine (Horse)</option>
+          </select>
+          <select id="statusFilterSelect" class="filter-select" aria-label="Filter by Health Status">
+            <option value="ALL">All Health Statuses</option>
+            <option value="WITHHOLD">Active Withhold Only</option>
+            <option value="QUARANTINE">Quarantine Only</option>
+            <option value="BOOSTER_DUE">Booster Due</option>
+            <option value="CLEARED">Cleared / Healthy</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- TAB PANEL 1: HERD & FLOCK MASTER LEDGER -->
+      <div class="tab-panel active" id="tab-herd" role="tabpanel">
+        <div class="table-container">
+          <table class="data-table" id="herdTable">
+            <thead>
+              <tr>
+                <th scope="col" style="width: 140px;">Tag ID &amp; RFID</th>
+                <th scope="col" style="width: 130px;">Species / Class</th>
+                <th scope="col" style="width: 140px;">Location / Pen</th>
+                <th scope="col" style="width: 150px;">Health Status</th>
+                <th scope="col">Last Intervention</th>
+                <th scope="col" style="width: 190px;">Withhold Clearance</th>
+                <th scope="col" style="width: 110px;" class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="herdTableBody">
+              <!-- Dynamically populated via JS -->
+            </tbody>
+          </table>
+          <div class="empty-state" id="herdEmptyState" style="display: none;">
+            <p class="empty-heading">No livestock records matching current query parameters.</p>
+            <p class="empty-sub">Adjust your search term, species filters, or clear active flags.</p>
+            <button type="button" class="btn btn-secondary btn-sm" id="resetFiltersBtn">Reset Query Filters</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB PANEL 2: CLINICAL ADMINISTRATION AUDIT LOG -->
+      <div class="tab-panel" id="tab-treatments" role="tabpanel">
+        <div class="table-container">
+          <table class="data-table" id="treatmentsTable">
+            <thead>
+              <tr>
+                <th scope="col" style="width: 110px;">Date</th>
+                <th scope="col" style="width: 120px;">Target ID</th>
+                <th scope="col">Medication / Vaccine</th>
+                <th scope="col" style="width: 110px;">Lot / Batch</th>
+                <th scope="col" style="width: 90px;">Route</th>
+                <th scope="col" style="width: 90px;">Dose</th>
+                <th scope="col" style="width: 130px;">Withdrawal</th>
+                <th scope="col" style="width: 140px;">Applicator / Tech</th>
+              </tr>
+            </thead>
+            <tbody id="treatmentsTableBody">
+              <!-- Dynamically populated via JS -->
+            </tbody>
+          </table>
+          <div class="empty-state" id="treatmentEmptyState" style="display: none;">
+            <p class="empty-heading">No treatment records match the active criteria.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB PANEL 3: MANDATORY PROTOCOLS & REFERENCE -->
+      <div class="tab-panel" id="tab-protocols" role="tabpanel">
+        <div class="protocol-guide-grid">
+          <div class="guide-card">
+            <h3 class="guide-title">Standard Biosecurity &amp; Vaccination Protocols</h3>
+            <p class="guide-text">Regulatory recommended intervals for breeding herds and feedlot arrivals under supervision.</p>
+            
+            <dl class="protocol-definition-list">
+              <div class="protocol-entry">
+                <dt>Bovine 7-Way Clostridial + Somnus</dt>
+                <dd>Primary dose at 60–90 days age. Secondary booster 21–28 days post. Annual revaccination for brood cows 30 days prior to calving. Meat withhold: 21 days.</dd>
+              </div>
+              <div class="protocol-entry">
+                <dt>BVD / IBR / BRSV / PI3 (Modified Live)</dt>
+                <dd>Administer to replacement heifers prior to breeding. Avoid administering to naive pregnant cows unless label verified. Meat withhold: 21 days.</dd>
+              </div>
+              <div class="protocol-entry">
+                <dt>Caprine / Ovine CDT (Clostridium C, D &amp; Tetanus)</dt>
+                <dd>Ewes/does vaccinated 4 weeks prior to parturition for colostral passive immunity transfer. Offspring at 6 and 10 weeks. Meat withhold: 21 days.</dd>
+              </div>
+              <div class="protocol-entry">
+                <dt>Broad-Spectrum Anti-Parasitic (Ivermectin Pour-On / Injectable)</dt>
+                <dd>Fall/Spring seasonal rotation. Strict slaughter withhold: 35 days (injectable) or 48 days (topical formulations depending on carrier).</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="guide-card regulatory-card">
+            <h3 class="guide-title">USDA FSIS &amp; FARAD Withhold Directives</h3>
+            <p class="guide-text">Statutory obligations for agricultural operations distributing milk, fibers, or animals into commerce:</p>
+            <ul class="regulatory-list">
+              <li><strong>Zero Residue Tolerance:</strong> Carcasses detected with violative antimicrobial or therapeutic residues at slaughter are condemned with mandatory premise-level traceback.</li>
+              <li><strong>Calculated Off-Label Withholds:</strong> Any extra-label drug use (ELDU) authorized under AMDUCA requires extended withdrawal calculated specifically by a veterinarian.</li>
+              <li><strong>Lot Quarantine Procedure:</strong> Animals receiving reactive treatments must be physically segregated or tagged with high-visibility secondary ear tape until the designated withholding date.</li>
+            </ul>
+            <div class="callout-box">
+              <span class="callout-label">Official FARAD Reference Desk:</span>
+              <span class="callout-value">Food Animal Residue Avoidance Databank (1-888-US-FARAD)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL: RECORD TREATMENT OR VACCINATION -->
+  <div class="modal-overlay" id="recordModal" aria-hidden="true" role="dialog" aria-labelledby="modalTitle">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="modalTitle">Log Clinical Intervention</h2>
+          <p class="modal-subtitle">Official premise treatment entry. All fields enter traceable ledger.</p>
+        </div>
+        <button type="button" class="btn-close" id="closeModalBtn" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <form id="recordTreatmentForm" class="modal-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formAnimalTag">Animal Visual Tag ID <span class="req">*</span></label>
+            <input type="text" id="formAnimalTag" required placeholder="e.g., TAG-804" class="form-input">
+            <span class="field-help">Assigned ear tag or neck chain ID</span>
+          </div>
+          <div class="form-group">
+            <label for="formRfidTag">RFID / 840 EID Number</label>
+            <input type="text" id="formRfidTag" placeholder="840 003 918 204 112" class="form-input mono">
+            <span class="field-help">15-digit electronic identification tag</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formSpecies">Species Category <span class="req">*</span></label>
+            <select id="formSpecies" required class="form-input">
+              <option value="Bovine">Bovine (Beef / Dairy Cattle)</option>
+              <option value="Ovine">Ovine (Sheep)</option>
+              <option value="Caprine">Caprine (Goat)</option>
+              <option value="Porcine">Porcine (Swine)</option>
+              <option value="Equine">Equine (Horse)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="formPen">Pasture / Enclosure Location <span class="req">*</span></label>
+            <input type="text" id="formPen" required placeholder="e.g., Pasture 4 (North Creek)" class="form-input">
+          </div>
+        </div>
+
+        <div class="form-divider"><span>Pharmaceutical &amp; Biologic Details</span></div>
+
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="formDrugName">Product Name / Vaccine Protocol <span class="req">*</span></label>
+            <input type="text" id="formDrugName" required placeholder="e.g., Bovi-Shield Gold FP5 L5" class="form-input">
+          </div>
+          <div class="form-group flex-1">
+            <label for="formInterventionType">Classification <span class="req">*</span></label>
+            <select id="formInterventionType" required class="form-input">
+              <option value="Vaccination">Vaccination</option>
+              <option value="Antibiotic">Antibiotic Therapy</option>
+              <option value="Anthelmintic">Dewormer / Parasiticide</option>
+              <option value="Anti-inflammatory">Anti-inflammatory</option>
+              <option value="Electrolyte/Vitamin">Nutritional / Supportive</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formLotNumber">Manufacturer Lot / Serial # <span class="req">*</span></label>
+            <input type="text" id="formLotNumber" required placeholder="e.g., LOT-24K81A" class="form-input mono">
+            <span class="field-help">Mandatory for biological recall protection</span>
+          </div>
+          <div class="form-group">
+            <label for="formRoute">Administration Route <span class="req">*</span></label>
+            <select id="formRoute" required class="form-input">
+              <option value="Sub-Q (Neck)">Sub-Q (Subcutaneous Neck)</option>
+              <option value="Intramuscular">IM (Intramuscular)</option>
+              <option value="Intranasal">Intranasal</option>
+              <option value="Oral Drench">Oral Drench</option>
+              <option value="Topical Pour-On">Topical Pour-On</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="formDose">Dose (mL / mg) <span class="req">*</span></label>
+            <input type="text" id="formDose" required placeholder="e.g., 5.0 mL" class="form-input">
+          </div>
+        </div>
+
+        <div class="form-divider"><span>Regulatory Withhold &amp; Authorization</span></div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formAdminDate">Date of Administration <span class="req">*</span></label>
+            <input type="date" id="formAdminDate" required class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="formMeatWithholdDays">Meat Withhold (Days) <span class="req">*</span></label>
+            <input type="number" id="formMeatWithholdDays" min="0" value="21" required class="form-input">
+            <span class="field-help">Enter 0 if zero-day slaughter clearance</span>
+          </div>
+          <div class="form-group">
+            <label for="formMilkWithholdDays">Milk Withhold (Days)</label>
+            <input type="number" id="formMilkWithholdDays" min="0" value="0" class="form-input">
+            <span class="field-help">If applicable for dairy output</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="formAdministeredBy">Administering Tech / Vet <span class="req">*</span></label>
+            <input type="text" id="formAdministeredBy" required placeholder="e.g., M. Gallagher (Herdsman)" class="form-input">
+          </div>
+          <div class="form-group flex-1">
+            <label for="formQuarantineRequired">Quarantine Status</label>
+            <select id="formQuarantineRequired" class="form-input">
+              <option value="NO">Normal Pasture Return</option>
+              <option value="YES">Quarantine Isolation Pen</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="formClinicalNotes">Clinical Notes &amp; Symptoms (Optional)</label>
+          <textarea id="formClinicalNotes" rows="2" placeholder="e.g., Elevated temp (104.2 F), respiratory crackles on right lung, administered in right cervical injection triangle..." class="form-input"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cancelModalBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Commit Record to Ledger</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ANIMAL CLINICAL DOSSIER -->
+  <div class="modal-overlay" id="dossierModal" aria-hidden="true" role="dialog" aria-labelledby="dossierTitle">
+    <div class="modal-box dossier-box">
+      <div class="modal-header">
+        <div>
+          <div class="dossier-pill-group">
+            <span class="tag-badge" id="dossierTagId">TAG-000</span>
+            <span class="status-badge" id="dossierStatusBadge">Healthy</span>
+          </div>
+          <h2 class="modal-title" id="dossierTitle">Livestock Health Dossier</h2>
+          <p class="modal-subtitle" id="dossierSubtitle">Complete clinical administration history &amp; traceability lineage.</p>
+        </div>
+        <button type="button" class="btn-close" id="closeDossierBtn" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <div class="dossier-body">
+        <div class="dossier-specs-grid">
+          <div class="spec-cell">
+            <span class="spec-label">Species &amp; Class</span>
+            <span class="spec-val" id="dossierSpecies">Bovine</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-label">Assigned Pasture</span>
+            <span class="spec-val" id="dossierLocation">Pasture North</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-label">RFID Number</span>
+            <span class="spec-val mono" id="dossierRfid">840 000 000 000 000</span>
+          </div>
+          <div class="spec-cell">
+            <span class="spec-label">Withhold Status</span>
+            <span class="spec-val" id="dossierWithholdStatus">Cleared</span>
+          </div>
+        </div>
+
+        <h3 class="section-label-sm">Chronological Treatment &amp; Vaccine Timeline</h3>
+        <div class="timeline-container" id="dossierTimeline">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="dossierCloseFooterBtn">Close Dossier</button>
+        <button type="button" class="btn btn-primary" id="dossierNewTreatmentBtn">Add New Entry for this Animal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SITE FOOTER -->
+  <footer class="site-footer">
+    <div class="site-container footer-inner">
+      <div class="footer-col-main">
+        <div class="footer-brand">StockLedger Veterinary Audit Registry</div>
+        <p class="footer-desc">
+          Structured operational ledger engineered for commercial cow-calf operations, dairy herds, sheep flocks, 
+          and feedlots adhering to USDA Food Safety and Inspection Service (FSIS) residue avoidance standards.
+        </p>
+        <p class="footer-legal">
+          Records are stored client-side in local browser storage for field reliability in rural connectivity zones. 
+          Audit exports meet record-keeping standards for organic certifications, Global GAP, and state veterinary compliance.
+        </p>
+      </div>
+      <div class="footer-col-tools">
+        <h4 class="footer-heading">Ledger Maintenance</h4>
+        <ul class="footer-tools-list">
+          <li><button type="button" class="link-btn" id="loadSampleDataBtn">Restore Baseline Livestock Data</button></li>
+          <li><button type="button" class="link-btn" id="clearStorageBtn">Purge Local Ledger Cache</button></li>
+          <li><button type="button" class="link-btn" id="printLedgerBtn">Print Current Page Ledger</button></li>
+        </ul>
+        <div class="footer-privacy-note">
+          <strong>Privacy &amp; Data Sovereignty:</strong> No external analytics, trackers, or commercial telemetry are loaded.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
